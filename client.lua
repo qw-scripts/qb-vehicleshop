@@ -2,7 +2,6 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local PlayerData = QBCore.Functions.GetPlayerData()
 local testDriveZone = nil
-local vehicleMenu = {}
 
 -- Static Context Menus
 lib.registerContext({
@@ -93,8 +92,7 @@ local function getVehName()
 end
 
 local function getVehPrice()
-    return comma_value(QBCore.Shared.Vehicles[Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle
-        ]["price"])
+    return comma_value(QBCore.Shared.Vehicles[Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle]["price"])
 end
 
 local function getVehBrand()
@@ -102,17 +100,12 @@ local function getVehBrand()
 end
 
 local function setClosestShowroomVehicle()
-    local pos = GetEntityCoords(PlayerPedId(), true)
+    local pos = GetEntityCoords(cache.ped, true)
     local current = nil
     local dist = nil
     local closestShop = insideShop
     for id in pairs(Config.Shops[closestShop]["ShowroomVehicles"]) do
-        local dist2 = #
-            (
-            pos -
-                vector3(Config.Shops[closestShop]["ShowroomVehicles"][id].coords.x,
-                    Config.Shops[closestShop]["ShowroomVehicles"][id].coords.y,
-                    Config.Shops[closestShop]["ShowroomVehicles"][id].coords.z))
+        local dist2 = #(pos -vector3(Config.Shops[closestShop]["ShowroomVehicles"][id].coords.x,Config.Shops[closestShop]["ShowroomVehicles"][id].coords.y,Config.Shops[closestShop]["ShowroomVehicles"][id].coords.z))
         if current then
             if dist2 < dist then
                 current = id
@@ -138,8 +131,8 @@ local function createTestDriveReturn()
         })
 
     testDriveZone:onPlayerInOut(function(isPointInside)
-        if isPointInside and IsPedInAnyVehicle(PlayerPedId()) then
-            SetVehicleForwardSpeed(GetVehiclePedIsIn(PlayerPedId(), false), 0)
+        if isPointInside and IsPedInAnyVehicle(cache.ped) then
+            SetVehicleForwardSpeed(GetVehiclePedIsIn(cache.ped, false), 0)
             lib.showContext('rettestdrive_header_menu')
         else
             lib.hideContext()
@@ -157,14 +150,13 @@ local function startTestDriveTimer(testDriveTime, prevCoords)
                     TriggerServerEvent('qb-vehicleshop:server:deleteVehicle', testDriveVeh)
                     testDriveVeh = 0
                     inTestDrive = false
-                    SetEntityCoords(PlayerPedId(), prevCoords)
+                    SetEntityCoords(cache.ped, prevCoords)
                     lib.notify({
                         title = Lang:t('general.testdrive_complete'),
                         type = 'success'
                     })
                 end
-                drawTxt(Lang:t('general.testdrive_timer') .. math.ceil(testDriveTime - secondsLeft / 1000), 4, 0.5, 0.93
-                    , 0.50, 255, 255, 255, 180)
+                drawTxt(Lang:t('general.testdrive_timer') .. math.ceil(testDriveTime - secondsLeft / 1000), 4, 0.5, 0.93, 0.50, 255, 255, 255, 180)
             end
             Wait(0)
         end
@@ -175,9 +167,7 @@ local function createVehZones(shopName, entity)
     if not Config.UsingTarget then
         for i = 1, #Config.Shops[shopName]['ShowroomVehicles'] do
             zones[#zones + 1] = BoxZone:Create(
-                vector3(Config.Shops[shopName]['ShowroomVehicles'][i]['coords'].x,
-                    Config.Shops[shopName]['ShowroomVehicles'][i]['coords'].y,
-                    Config.Shops[shopName]['ShowroomVehicles'][i]['coords'].z),
+                vector3(Config.Shops[shopName]['ShowroomVehicles'][i]['coords'].x,Config.Shops[shopName]['ShowroomVehicles'][i]['coords'].y,Config.Shops[shopName]['ShowroomVehicles'][i]['coords'].z),
                 Config.Shops[shopName]['Zone']['size'],
                 Config.Shops[shopName]['Zone']['size'],
                 {
@@ -190,9 +180,7 @@ local function createVehZones(shopName, entity)
         local combo = ComboZone:Create(zones, { name = "vehCombo", debugPoly = false })
         combo:onPlayerInOut(function(isPointInside)
             if isPointInside then
-                if PlayerData and PlayerData.job and
-                    (PlayerData.job.name == Config.Shops[insideShop]['Job'] or Config.Shops[insideShop]['Job'] == 'none'
-                    ) then
+                if PlayerData and PlayerData.job and(PlayerData.job.name == Config.Shops[insideShop]['Job'] or Config.Shops[insideShop]['Job'] == 'none') then
                     lib.showContext('veh_header_menu')
                 end
             else
@@ -208,10 +196,7 @@ local function createVehZones(shopName, entity)
                 label = Lang:t('general.vehinteraction'),
                 canInteract = function()
                     local closestShop = insideShop
-                    return closestShop and
-                        (
-                        Config.Shops[closestShop]['Job'] == 'none' or
-                            PlayerData.job.name == Config.Shops[closestShop]['Job'])
+                    return closestShop and (Config.Shops[closestShop]['Job'] == 'none' or PlayerData.job.name == Config.Shops[closestShop]['Job'])
                 end
             }
         }
@@ -409,7 +394,7 @@ end)
 RegisterNetEvent('qb-vehicleshop:client:TestDrive', function()
     if not inTestDrive and ClosestVehicle ~= 0 then
         inTestDrive = true
-        local prevCoords = GetEntityCoords(PlayerPedId())
+        local prevCoords = GetEntityCoords(cache.ped)
         tempShop = insideShop -- temp hacky way of setting the shop because it changes after the callback has returned since you are outside the zone
         QBCore.Functions.TriggerCallback('QBCore:Server:SpawnVehicle', function(netId)
             local veh = NetToVeh(netId)
@@ -439,7 +424,7 @@ RegisterNetEvent('qb-vehicleshop:client:customTestDrive', function(data)
     if not inTestDrive then
         inTestDrive = true
         local vehicle = data
-        local prevCoords = GetEntityCoords(PlayerPedId())
+        local prevCoords = GetEntityCoords(cache.ped)
         tempShop = insideShop -- temp hacky way of setting the shop because it changes after the callback has returned since you are outside the zone
         QBCore.Functions.TriggerCallback('QBCore:Server:SpawnVehicle', function(netId)
             local veh = NetToVeh(netId)
@@ -465,7 +450,7 @@ RegisterNetEvent('qb-vehicleshop:client:customTestDrive', function(data)
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:TestDriveReturn', function()
-    local ped = PlayerPedId()
+    local ped = cache.ped
     local veh = GetVehiclePedIsIn(ped)
     local entity = NetworkGetEntityFromNetworkId(testDriveVeh)
     if veh == entity then
