@@ -3,6 +3,41 @@ local QBCore = exports['qb-core']:GetCoreObject()
 local PlayerData = QBCore.Functions.GetPlayerData()
 local testDriveZone = nil
 local vehicleMenu = {}
+
+-- Static Context Menus
+lib.registerContext({
+    id = "veh_header_menu",
+    title = Lang:t('menus.vehHeader_header'),
+    options = {
+        {
+            title = Lang:t('menus.vehHeader_txt'),
+            event = 'qb-vehicleshop:client:showVehOptions'
+        }
+    }
+})
+
+lib.registerContext({
+    id = "fin_header_menu",
+    title = Lang:t('menus.financed_header'),
+    options = {
+        {
+            title = Lang:t('menus.finance_txt'),
+            event = 'qb-vehicleshop:client:getVehicles'
+        }
+    }
+})
+
+lib.registerContext({
+    id = "rettestdrive_header_menu",
+    title = Lang:t('menus.returnTestDrive_header'),
+    options = {
+        {
+            title = Lang:t('menus.finance_txt'),
+            event = 'qb-vehicleshop:client:TestDriveReturn'
+        }
+    }
+})
+
 local Initialized = false
 local testDriveVeh, inTestDrive = 0, false
 local ClosestVehicle = 1
@@ -28,39 +63,6 @@ RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
     TriggerServerEvent('qb-vehicleshop:server:removePlayer', citizenid)
     PlayerData = {}
 end)
-
--- Static Headers
-local vehHeaderMenu = {
-    {
-        header = Lang:t('menus.vehHeader_header'),
-        txt = Lang:t('menus.vehHeader_txt'),
-        icon = "fa-solid fa-car",
-        params = {
-            event = 'qb-vehicleshop:client:showVehOptions'
-        }
-    }
-}
-
-local financeMenu = {
-    {
-        header = Lang:t('menus.financed_header'),
-        txt = Lang:t('menus.finance_txt'),
-        icon = "fa-solid fa-user-ninja",
-        params = {
-            event = 'qb-vehicleshop:client:getVehicles'
-        }
-    }
-}
-
-local returnTestDrive = {
-    {
-        header = Lang:t('menus.returnTestDrive_header'),
-        icon = "fa-solid fa-flag-checkered",
-        params = {
-            event = 'qb-vehicleshop:client:TestDriveReturn'
-        }
-    }
-}
 
 -- Functions
 local function drawTxt(text, font, x, y, scale, r, g, b, a)
@@ -91,7 +93,8 @@ local function getVehName()
 end
 
 local function getVehPrice()
-    return comma_value(QBCore.Shared.Vehicles[Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle]["price"])
+    return comma_value(QBCore.Shared.Vehicles[Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle
+        ]["price"])
 end
 
 local function getVehBrand()
@@ -104,7 +107,12 @@ local function setClosestShowroomVehicle()
     local dist = nil
     local closestShop = insideShop
     for id in pairs(Config.Shops[closestShop]["ShowroomVehicles"]) do
-        local dist2 = #(pos - vector3(Config.Shops[closestShop]["ShowroomVehicles"][id].coords.x, Config.Shops[closestShop]["ShowroomVehicles"][id].coords.y, Config.Shops[closestShop]["ShowroomVehicles"][id].coords.z))
+        local dist2 = #
+            (
+            pos -
+                vector3(Config.Shops[closestShop]["ShowroomVehicles"][id].coords.x,
+                    Config.Shops[closestShop]["ShowroomVehicles"][id].coords.y,
+                    Config.Shops[closestShop]["ShowroomVehicles"][id].coords.z))
         if current then
             if dist2 < dist then
                 current = id
@@ -132,9 +140,9 @@ local function createTestDriveReturn()
     testDriveZone:onPlayerInOut(function(isPointInside)
         if isPointInside and IsPedInAnyVehicle(PlayerPedId()) then
             SetVehicleForwardSpeed(GetVehiclePedIsIn(PlayerPedId(), false), 0)
-            exports['qb-menu']:openMenu(returnTestDrive)
+            lib.showContext('rettestdrive_header_menu')
         else
-            exports['qb-menu']:closeMenu()
+            lib.hideContext()
         end
     end)
 end
@@ -150,9 +158,13 @@ local function startTestDriveTimer(testDriveTime, prevCoords)
                     testDriveVeh = 0
                     inTestDrive = false
                     SetEntityCoords(PlayerPedId(), prevCoords)
-                    QBCore.Functions.Notify(Lang:t('general.testdrive_complete'))
+                    lib.notify({
+                        title = Lang:t('general.testdrive_complete'),
+                        type = 'success'
+                    })
                 end
-                drawTxt(Lang:t('general.testdrive_timer') .. math.ceil(testDriveTime - secondsLeft / 1000), 4, 0.5, 0.93, 0.50, 255, 255, 255, 180)
+                drawTxt(Lang:t('general.testdrive_timer') .. math.ceil(testDriveTime - secondsLeft / 1000), 4, 0.5, 0.93
+                    , 0.50, 255, 255, 255, 180)
             end
             Wait(0)
         end
@@ -175,32 +187,36 @@ local function createVehZones(shopName, entity)
                     debugPoly = false,
                 })
         end
-        local combo = ComboZone:Create(zones, {name = "vehCombo", debugPoly = false})
+        local combo = ComboZone:Create(zones, { name = "vehCombo", debugPoly = false })
         combo:onPlayerInOut(function(isPointInside)
             if isPointInside then
-                if PlayerData and PlayerData.job and (PlayerData.job.name == Config.Shops[insideShop]['Job'] or Config.Shops[insideShop]['Job'] == 'none') then
-                    exports['qb-menu']:showHeader(vehHeaderMenu)
+                if PlayerData and PlayerData.job and
+                    (PlayerData.job.name == Config.Shops[insideShop]['Job'] or Config.Shops[insideShop]['Job'] == 'none'
+                    ) then
+                    lib.showContext('veh_header_menu')
                 end
             else
-                exports['qb-menu']:closeMenu()
+                lib.hideContext()
             end
         end)
     else
-        exports['qb-target']:AddTargetEntity(entity, {
-            options = {
-                {
-                    type = "client",
-                    event = "qb-vehicleshop:client:showVehOptions",
-                    icon = "fas fa-car",
-                    label = Lang:t('general.vehinteraction'),
-                    canInteract = function()
-                        local closestShop = insideShop
-                        return closestShop and (Config.Shops[closestShop]['Job'] == 'none' or PlayerData.job.name == Config.Shops[closestShop]['Job'])
-                    end
-                },
-            },
-            distance = 3.0
-        })
+        local options = {
+            {
+                name = 'vehicleshop:showVehicleOptions',
+                event = 'qb-vehicleshop:client:showVehOptions',
+                icon = "fas fa-car",
+                label = Lang:t('general.vehinteraction'),
+                canInteract = function()
+                    local closestShop = insideShop
+                    return closestShop and
+                        (
+                        Config.Shops[closestShop]['Job'] == 'none' or
+                            PlayerData.job.name == Config.Shops[closestShop]['Job'])
+                end
+            }
+        }
+
+        exports.ox_target:addEntity(entity, options)
     end
 end
 
@@ -218,53 +234,41 @@ function createFreeUseShop(shopShape, name)
             CreateThread(function()
                 while insideShop do
                     setClosestShowroomVehicle()
-                    vehicleMenu = {
-                        {
-                            isMenuHeader = true,
-                            icon = "fa-solid fa-circle-info",
-                            header = getVehBrand():upper() .. ' ' .. getVehName():upper() .. ' - $' .. getVehPrice(),
-                        },
-                        {
-                            header = Lang:t('menus.test_header'),
-                            txt = Lang:t('menus.freeuse_test_txt'),
-                            icon = "fa-solid fa-car-on",
-                            params = {
-                                event = 'qb-vehicleshop:client:TestDrive',
-                            }
-                        },
-                        {
-                            header = Lang:t('menus.freeuse_buy_header'),
-                            txt = Lang:t('menus.freeuse_buy_txt'),
-                            icon = "fa-solid fa-hand-holding-dollar",
-                            params = {
-                                isServer = true,
-                                event = 'qb-vehicleshop:server:buyShowroomVehicle',
+
+                    lib.registerContext({
+                        id = 'veh_menu',
+                        title = getVehBrand():upper() .. ' ' .. getVehName():upper() .. ' - $' .. getVehPrice(),
+                        options = {
+                            {
+                                title = Lang:t('menus.test_header'),
+                                description = Lang:t('menus.freeuse_test_txt'),
+                                event = 'qb-vehicleshop:client:TestDrive'
+                            },
+                            {
+                                title = Lang:t('menus.freeuse_buy_header'),
+                                description = Lang:t('menus.freeuse_buy_txt'),
+                                serverEvent = 'qb-vehicleshop:server:buyShowroomVehicle',
                                 args = {
                                     buyVehicle = Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle
                                 }
-                            }
-                        },
-                        {
-                            header = Lang:t('menus.finance_header'),
-                            txt = Lang:t('menus.freeuse_finance_txt'),
-                            icon = "fa-solid fa-coins",
-                            params = {
+                            },
+                            {
+                                title = Lang:t('menus.finance_header'),
+                                description = Lang:t('menus.freeuse_finance_txt'),
                                 event = 'qb-vehicleshop:client:openFinance',
                                 args = {
                                     price = getVehPrice(),
                                     buyVehicle = Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle
                                 }
-                            }
-                        },
-                        {
-                            header = Lang:t('menus.swap_header'),
-                            txt = Lang:t('menus.swap_txt'),
-                            icon = "fa-solid fa-arrow-rotate-left",
-                            params = {
+                            },
+                            {
+                                title = Lang:t('menus.swap_header'),
+                                description = Lang:t('menus.swap_txt'),
                                 event = 'qb-vehicleshop:client:vehCategories',
-                            }
-                        },
-                    }
+                                arrow = true
+                            },
+                        }
+                    })
                     Wait(1000)
                 end
             end)
@@ -288,57 +292,46 @@ function createManagedShop(shopShape, name)
             CreateThread(function()
                 while insideShop and PlayerData.job and PlayerData.job.name == Config.Shops[name]['Job'] do
                     setClosestShowroomVehicle()
-                    vehicleMenu = {
-                        {
-                            isMenuHeader = true,
-                            icon = "fa-solid fa-circle-info",
-                            header = getVehBrand():upper() .. ' ' .. getVehName():upper() .. ' - $' .. getVehPrice(),
-                        },
-                        {
-                            header = Lang:t('menus.test_header'),
-                            txt = Lang:t('menus.managed_test_txt'),
-                            icon = "fa-solid fa-user-plus",
-                            params = {
+
+                    lib.registerContext({
+                        id = 'veh_menu',
+                        title = getVehBrand():upper() .. ' ' .. getVehName():upper() .. ' - $' .. getVehPrice(),
+                        options = {
+                            {
+                                title = Lang:t('menus.test_header'),
+                                description = Lang:t('menus.managed_test_txt'),
                                 event = 'qb-vehicleshop:client:openIdMenu',
                                 args = {
                                     vehicle = Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle,
                                     type = 'testDrive'
                                 }
-                            }
-                        },
-                        {
-                            header = Lang:t('menus.managed_sell_header'),
-                            txt = Lang:t('menus.managed_sell_txt'),
-                            icon = "fa-solid fa-cash-register",
-                            params = {
+                            },
+                            {
+                                title = Lang:t('menus.managed_sell_header'),
+                                description = Lang:t('menus.managed_sell_txt'),
                                 event = 'qb-vehicleshop:client:openIdMenu',
                                 args = {
                                     vehicle = Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle,
                                     type = 'sellVehicle'
                                 }
-                            }
-                        },
-                        {
-                            header = Lang:t('menus.finance_header'),
-                            txt = Lang:t('menus.managed_finance_txt'),
-                            icon = "fa-solid fa-coins",
-                            params = {
+                            },
+                            {
+                                title = Lang:t('menus.finance_header'),
+                                description = Lang:t('menus.managed_finance_txt'),
                                 event = 'qb-vehicleshop:client:openCustomFinance',
                                 args = {
                                     price = getVehPrice(),
                                     vehicle = Config.Shops[insideShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle
                                 }
-                            }
-                        },
-                        {
-                            header = Lang:t('menus.swap_header'),
-                            txt = Lang:t('menus.swap_txt'),
-                            icon = "fa-solid fa-arrow-rotate-left",
-                            params = {
+                            },
+                            {
+                                title = Lang:t('menus.swap_header'),
+                                description = Lang:t('menus.swap_txt'),
                                 event = 'qb-vehicleshop:client:vehCategories',
-                            }
-                        },
-                    }
+                                arrow = true
+                            },
+                        }
+                    })
                     Wait(1000)
                 end
             end)
@@ -363,8 +356,8 @@ function Init()
     CreateThread(function()
         local financeZone = BoxZone:Create(Config.FinanceZone, 2.0, 2.0, {
             name = "vehicleshop_financeZone",
-            offset = {0.0, 0.0, 0.0},
-            scale = {1.0, 1.0, 1.0},
+            offset = { 0.0, 0.0, 0.0 },
+            scale = { 1.0, 1.0, 1.0 },
             minZ = Config.FinanceZone.z - 1,
             maxZ = Config.FinanceZone.z + 1,
             debugPoly = false,
@@ -372,9 +365,9 @@ function Init()
 
         financeZone:onPlayerInOut(function(isPointInside)
             if isPointInside then
-                exports['qb-menu']:showHeader(financeMenu)
+                lib.showContext('fin_header_menu')
             else
-                exports['qb-menu']:closeMenu()
+                lib.hideContext()
             end
         end)
     end)
@@ -386,7 +379,9 @@ function Init()
                 while not HasModelLoaded(model) do
                     Wait(0)
                 end
-                local veh = CreateVehicle(model, Config.Shops[k]["ShowroomVehicles"][i].coords.x, Config.Shops[k]["ShowroomVehicles"][i].coords.y, Config.Shops[k]["ShowroomVehicles"][i].coords.z, false, false)
+                local veh = CreateVehicle(model, Config.Shops[k]["ShowroomVehicles"][i].coords.x,
+                    Config.Shops[k]["ShowroomVehicles"][i].coords.y, Config.Shops[k]["ShowroomVehicles"][i].coords.z,
+                    false, false)
                 SetModelAsNoLongerNeeded(model)
                 SetVehicleOnGroundProperly(veh)
                 SetEntityInvincible(veh, true)
@@ -404,11 +399,11 @@ end
 
 -- Events
 RegisterNetEvent('qb-vehicleshop:client:homeMenu', function()
-    exports['qb-menu']:openMenu(vehicleMenu)
+    lib.showContext('veh_menu')
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:showVehOptions', function()
-    exports['qb-menu']:openMenu(vehicleMenu)
+    lib.showContext('veh_menu')
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:TestDrive', function()
@@ -423,12 +418,20 @@ RegisterNetEvent('qb-vehicleshop:client:TestDrive', function()
             SetEntityHeading(veh, Config.Shops[tempShop]["TestDriveSpawn"].w)
             TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
             testDriveVeh = netId
-            QBCore.Functions.Notify(Lang:t('general.testdrive_timenoti', {testdrivetime = Config.Shops[tempShop]["TestDriveTimeLimit"]}))
-        end, Config.Shops[tempShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle, Config.Shops[tempShop]["TestDriveSpawn"], true)
+            lib.notify({
+                title = Lang:t('general.testdrive_timenoti',
+                    { testdrivetime = Config.Shops[tempShop]["TestDriveTimeLimit"] }),
+                type = 'inform'
+            })
+        end, Config.Shops[tempShop]["ShowroomVehicles"][ClosestVehicle].chosenVehicle,
+            Config.Shops[tempShop]["TestDriveSpawn"], true)
         createTestDriveReturn()
         startTestDriveTimer(Config.Shops[tempShop]["TestDriveTimeLimit"] * 60, prevCoords)
     else
-        QBCore.Functions.Notify(Lang:t('error.testdrive_alreadyin'), 'error')
+        lib.notify({
+            title = Lang:t('error.testdrive_alreadyin'),
+            type = 'error'
+        })
     end
 end)
 
@@ -445,12 +448,19 @@ RegisterNetEvent('qb-vehicleshop:client:customTestDrive', function(data)
             SetEntityHeading(veh, Config.Shops[tempShop]["TestDriveSpawn"].w)
             TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
             testDriveVeh = netId
-            QBCore.Functions.Notify(Lang:t('general.testdrive_timenoti', {testdrivetime = Config.Shops[tempShop]["TestDriveTimeLimit"]}))
+            lib.notify({
+                title = Lang:t('general.testdrive_timenoti',
+                    { testdrivetime = Config.Shops[tempShop]["TestDriveTimeLimit"] }),
+                type = 'inform'
+            })
         end, vehicle, Config.Shops[tempShop]["TestDriveSpawn"], true)
         createTestDriveReturn()
         startTestDriveTimer(Config.Shops[tempShop]["TestDriveTimeLimit"] * 60, prevCoords)
     else
-        QBCore.Functions.Notify(Lang:t('error.testdrive_alreadyin'), 'error')
+        lib.notify({
+            title = Lang:t('error.testdrive_alreadyin'),
+            type = 'error'
+        })
     end
 end)
 
@@ -462,152 +472,154 @@ RegisterNetEvent('qb-vehicleshop:client:TestDriveReturn', function()
         testDriveVeh = 0
         inTestDrive = false
         DeleteEntity(veh)
-        exports['qb-menu']:closeMenu()
+        lib.hideContext()
         testDriveZone:destroy()
     else
-        QBCore.Functions.Notify(Lang:t('error.testdrive_return'), 'error')
+        lib.notify({
+            title = Lang:t('error.testdrive_return'),
+            type = 'error'
+        })
     end
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:vehCategories', function()
     local categoryMenu = {
         {
-            header = Lang:t('menus.goback_header'),
+            title = Lang:t('menus.goback_header'),
             icon = "fa-solid fa-angle-left",
-            params = {
-                event = 'qb-vehicleshop:client:homeMenu'
-            }
+            event = 'qb-vehicleshop:client:homeMenu'
         }
     }
     for k, v in pairs(Config.Shops[insideShop]['Categories']) do
         categoryMenu[#categoryMenu + 1] = {
-            header = v,
-            icon = "fa-solid fa-circle",
-            params = {
-                event = 'qb-vehicleshop:client:openVehCats',
-                args = {
-                    catName = k
-                }
+            title = v,
+            event = 'qb-vehicleshop:client:openVehCats',
+            args = {
+                catName = k
             }
         }
     end
-    exports['qb-menu']:openMenu(categoryMenu)
+
+    lib.registerContext({
+        id = 'vehicleCategories',
+        title = Lang:t('menus.categories_header'),
+        options = categoryMenu
+    })
+
+    lib.showContext('vehicleCategories')
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:openVehCats', function(data)
     local vehMenu = {
         {
-            header = Lang:t('menus.goback_header'),
+            title = Lang:t('menus.goback_header'),
+            event = 'qb-vehicleshop:client:vehCategories',
             icon = "fa-solid fa-angle-left",
-            params = {
-                event = 'qb-vehicleshop:client:vehCategories'
-            }
         }
     }
+
     for k, v in pairs(QBCore.Shared.Vehicles) do
         if QBCore.Shared.Vehicles[k]["category"] == data.catName then
             if type(QBCore.Shared.Vehicles[k]["shop"]) == 'table' then
                 for _, shop in pairs(QBCore.Shared.Vehicles[k]["shop"]) do
                     if shop == insideShop then
                         vehMenu[#vehMenu + 1] = {
-                            header = v.name,
-                            txt = Lang:t('menus.veh_price') .. v.price,
-                            icon = "fa-solid fa-car-side",
-                            params = {
-                                isServer = true,
-                                event = 'qb-vehicleshop:server:swapVehicle',
-                                args = {
-                                    toVehicle = v.model,
-                                    ClosestVehicle = ClosestVehicle,
-                                    ClosestShop = insideShop
-                                }
+                            title = v.name,
+                            description = Lang:t('menus.veh_price') .. v.price,
+                            serverEvent = 'qb-vehicleshop:server:swapVehicle',
+                            args = {
+                                toVehicle = v.model,
+                                ClosestVehicle = ClosestVehicle,
+                                ClosestShop = insideShop
                             }
                         }
                     end
                 end
             elseif QBCore.Shared.Vehicles[k]["shop"] == insideShop then
                 vehMenu[#vehMenu + 1] = {
-                    header = v.name,
-                    txt = Lang:t('menus.veh_price') .. v.price,
-                    icon = "fa-solid fa-car-side",
-                    params = {
-                        isServer = true,
-                        event = 'qb-vehicleshop:server:swapVehicle',
-                        args = {
-                            toVehicle = v.model,
-                            ClosestVehicle = ClosestVehicle,
-                            ClosestShop = insideShop
-                        }
+                    title = v.name,
+                    description = Lang:t('menus.veh_price') .. v.price,
+                    serverEvent = 'qb-vehicleshop:server:swapVehicle',
+                    args = {
+                        toVehicle = v.model,
+                        ClosestVehicle = ClosestVehicle,
+                        ClosestShop = insideShop
                     }
                 }
             end
         end
     end
-    exports['qb-menu']:openMenu(vehMenu)
+
+    lib.registerContext({
+        id = 'open_veh_cats',
+        title = Lang:t('menus.categories_header'),
+        options = vehMenu
+    })
+
+    lib.showContext('open_veh_cats')
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:openFinance', function(data)
-    local dialog = exports['qb-input']:ShowInput({
-        header = getVehBrand():upper() .. ' ' .. data.buyVehicle:upper() .. ' - $' .. data.price,
-        submitText = Lang:t('menus.submit_text'),
-        inputs = {
-            {
-                type = 'number',
-                isRequired = true,
-                name = 'downPayment',
-                text = Lang:t('menus.financesubmit_downpayment') .. Config.MinimumDown .. '%'
-            },
-            {
-                type = 'number',
-                isRequired = true,
-                name = 'paymentAmount',
-                text = Lang:t('menus.financesubmit_totalpayment') .. Config.MaximumPayments
-            }
+    local dialog = lib.inputDialog(getVehBrand():upper() .. ' ' .. data.buyVehicle:upper() .. ' - $' .. data.price, {
+        {
+            type = 'number',
+            label = Lang:t('menus.financesubmit_downpayment') .. Config.MinimumDown .. '%',
+        },
+        {
+            type = 'number',
+            label = Lang:t('menus.financesubmit_totalpayment') .. Config.MaximumPayments,
         }
     })
-    if dialog then
-        if not dialog.downPayment or not dialog.paymentAmount then return end
-        TriggerServerEvent('qb-vehicleshop:server:financeVehicle', dialog.downPayment, dialog.paymentAmount, data.buyVehicle)
-    end
+
+    if not dialog then return end
+
+    local downPayment = tonumber(dialog[1])
+    local paymentAmount = tonumber(dialog[2])
+
+    if not downPayment or not paymentAmount then return end
+
+    TriggerServerEvent('qb-vehicleshop:server:financeVehicle', downPayment, paymentAmount,
+        data.buyVehicle)
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:openCustomFinance', function(data)
-    TriggerEvent('animations:client:EmoteCommandStart', {"tablet2"})
-    local dialog = exports['qb-input']:ShowInput({
-        header = getVehBrand():upper() .. ' ' .. data.vehicle:upper() .. ' - $' .. data.price,
-        submitText = Lang:t('menus.submit_text'),
-        inputs = {
-            {
-                type = 'number',
-                isRequired = true,
-                name = 'downPayment',
-                text = Lang:t('menus.financesubmit_downpayment') .. Config.MinimumDown .. '%'
-            },
-            {
-                type = 'number',
-                isRequired = true,
-                name = 'paymentAmount',
-                text = Lang:t('menus.financesubmit_totalpayment') .. Config.MaximumPayments
-            },
-            {
-                text = Lang:t('menus.submit_ID'),
-                name = "playerid",
-                type = "number",
-                isRequired = true
-            }
+    TriggerEvent('animations:client:EmoteCommandStart', { "tablet2" })
+
+    local dialog = lib.inputDialog(getVehBrand():upper() .. ' ' .. data.vehicle:upper() .. ' - $' .. data.price, {
+        {
+            type = 'number',
+            label = Lang:t('menus.financesubmit_downpayment') .. Config.MinimumDown .. '%',
+        },
+        {
+            type = 'number',
+            label = Lang:t('menus.financesubmit_totalpayment') .. Config.MaximumPayments,
+        },
+        {
+            type = 'number',
+            label = Lang:t('menus.submit_ID'),
         }
     })
-    if dialog then
-        if not dialog.downPayment or not dialog.paymentAmount or not dialog.playerid then return end
-        TriggerEvent('animations:client:EmoteCommandStart', {"c"})
-        TriggerServerEvent('qb-vehicleshop:server:sellfinanceVehicle', dialog.downPayment, dialog.paymentAmount, data.vehicle, dialog.playerid)
-    end
+
+    if not dialog then return end
+
+    local downPayment = tonumber(dialog[1])
+    local paymentAmount = tonumber(dialog[2])
+    local playerid = tonumber(dialog[3])
+
+    if not downPayment or not paymentAmount or not playerid then return end
+
+    TriggerEvent('animations:client:EmoteCommandStart', { "c" })
+    TriggerServerEvent('qb-vehicleshop:server:sellfinanceVehicle', downPayment, paymentAmount,
+        data.vehicle, playerid)
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:swapVehicle', function(data)
     local shopName = data.ClosestShop
     if Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].chosenVehicle ~= data.toVehicle then
-        local closestVehicle, closestDistance = QBCore.Functions.GetClosestVehicle(vector3(Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.x, Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.y, Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.z))
+        local closestVehicle, closestDistance = QBCore.Functions.GetClosestVehicle(vector3(Config.Shops[shopName][
+            "ShowroomVehicles"][data.ClosestVehicle].coords.x,
+            Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.y,
+            Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.z))
         if closestVehicle == 0 then return end
         if closestDistance < 5 then DeleteEntity(closestVehicle) end
         while DoesEntityExist(closestVehicle) do
@@ -619,7 +631,9 @@ RegisterNetEvent('qb-vehicleshop:client:swapVehicle', function(data)
         while not HasModelLoaded(model) do
             Wait(50)
         end
-        local veh = CreateVehicle(model, Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.x, Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.y, Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.z, false, false)
+        local veh = CreateVehicle(model, Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.x,
+            Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.y,
+            Config.Shops[shopName]["ShowroomVehicles"][data.ClosestVehicle].coords.z, false, false)
         while not DoesEntityExist(veh) do
             Wait(50)
         end
@@ -654,25 +668,34 @@ RegisterNetEvent('qb-vehicleshop:client:getVehicles', function()
                 local name = QBCore.Shared.Vehicles[v.vehicle]["name"]
                 local plate = v.plate:upper()
                 ownedVehicles[#ownedVehicles + 1] = {
-                    header = name,
-                    txt = Lang:t('menus.veh_platetxt') .. plate,
+                    title = name,
+                    description = Lang:t('menus.veh_platetxt') .. plate,
                     icon = "fa-solid fa-car-side",
-                    params = {
-                        event = 'qb-vehicleshop:client:getVehicleFinance',
-                        args = {
-                            vehiclePlate = plate,
-                            balance = v.balance,
-                            paymentsLeft = v.paymentsleft,
-                            paymentAmount = v.paymentamount
-                        }
+                    event = 'qb-vehicleshop:client:getVehicleFinance',
+                    args = {
+                        vehiclePlate = plate,
+                        balance = v.balance,
+                        paymentsLeft = v.paymentsleft,
+                        paymentAmount = v.paymentamount
                     }
                 }
             end
         end
+
+        lib.registerContext({
+            id = 'owned_vehicles',
+            title = Lang:t('menus.owned_vehicles_header'),
+            options = ownedVehicles
+        })
+
         if #ownedVehicles > 0 then
-            exports['qb-menu']:openMenu(ownedVehicles)
+            lib.showContext('owned_vehicles')
         else
-            QBCore.Functions.Notify(Lang:t('error.nofinanced'), 'error', 7500)
+            lib.notify({
+                title = Lang:t('error.nofinanced'),
+                type = 'error',
+                duration = 7500
+            })
         end
     end)
 end)
@@ -680,96 +703,83 @@ end)
 RegisterNetEvent('qb-vehicleshop:client:getVehicleFinance', function(data)
     local vehFinance = {
         {
-            header = Lang:t('menus.goback_header'),
-            params = {
-                event = 'qb-vehicleshop:client:getVehicles'
+            title = Lang:t('menus.goback_header'),
+            event = 'qb-vehicleshop:client:getVehicles',
+            icon = "fa-solid fa-angle-left",
+        },
+        {
+            title = Lang:t('menus.veh_finance_balance'),
+            description = Lang:t('menus.veh_finance_currency') .. comma_value(data.balance)
+        },
+        {
+            title = Lang:t('menus.veh_finance_total'),
+            description = data.paymentsLeft
+        },
+        {
+            title = Lang:t('menus.veh_finance_reccuring'),
+            description = Lang:t('menus.veh_finance_currency') .. comma_value(data.paymentAmount)
+        },
+        {
+            title = Lang:t('menus.veh_finance_pay'),
+            event = 'qb-vehicleshop:client:financePayment',
+            args = {
+                vehData = data,
+                paymentsLeft = data.paymentsleft,
+                paymentAmount = data.paymentamount
             }
         },
         {
-            isMenuHeader = true,
-            icon = "fa-solid fa-sack-dollar",
-            header = Lang:t('menus.veh_finance_balance'),
-            txt = Lang:t('menus.veh_finance_currency') .. comma_value(data.balance)
-        },
-        {
-            isMenuHeader = true,
-            icon = "fa-solid fa-hashtag",
-            header = Lang:t('menus.veh_finance_total'),
-            txt = data.paymentsLeft
-        },
-        {
-            isMenuHeader = true,
-            icon = "fa-solid fa-sack-dollar",
-            header = Lang:t('menus.veh_finance_reccuring'),
-            txt = Lang:t('menus.veh_finance_currency') .. comma_value(data.paymentAmount)
-        },
-        {
-            header = Lang:t('menus.veh_finance_pay'),
-            icon = "fa-solid fa-hand-holding-dollar",
-            params = {
-                event = 'qb-vehicleshop:client:financePayment',
-                args = {
-                    vehData = data,
-                    paymentsLeft = data.paymentsleft,
-                    paymentAmount = data.paymentamount
-                }
-            }
-        },
-        {
-            header = Lang:t('menus.veh_finance_payoff'),
-            icon = "fa-solid fa-hand-holding-dollar",
-            params = {
-                isServer = true,
-                event = 'qb-vehicleshop:server:financePaymentFull',
-                args = {
-                    vehBalance = data.balance,
-                    vehPlate = data.vehiclePlate
-                }
+            title = Lang:t('menus.veh_finance_payoff'),
+            serverEvent = 'qb-vehicleshop:server:financePaymentFull',
+            args = {
+                vehBalance = data.balance,
+                vehPlate = data.vehiclePlate
             }
         },
     }
-    exports['qb-menu']:openMenu(vehFinance)
+
+    lib.registerContext({
+        id = 'vehFinance',
+        title = Lang:t('menus.financed_header'),
+        options = vehFinance
+    })
+
+    lib.showContext('vehFinance')
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:financePayment', function(data)
-    local dialog = exports['qb-input']:ShowInput({
-        header = Lang:t('menus.veh_finance'),
-        submitText = Lang:t('menus.veh_finance_pay'),
-        inputs = {
-            {
-                type = 'number',
-                isRequired = true,
-                name = 'paymentAmount',
-                text = Lang:t('menus.veh_finance_payment')
-            }
+    local dialog = lib.inputDialog(Lang:t('menus.veh_finance'), {
+        {
+            type = 'number',
+            label = Lang:t('menus.veh_finance_payment'),
+            placeholder = 1000
         }
     })
-    if dialog then
-        if not dialog.paymentAmount then return end
-        TriggerServerEvent('qb-vehicleshop:server:financePayment', dialog.paymentAmount, data.vehData)
-    end
+
+    if not dialog then return end
+
+    local paymentAmount = tonumber(dialog[1])
+    TriggerServerEvent('qb-vehicleshop:server:financePayment', paymentAmount, data.vehData)
 end)
 
 RegisterNetEvent('qb-vehicleshop:client:openIdMenu', function(data)
-    local dialog = exports['qb-input']:ShowInput({
-        header = QBCore.Shared.Vehicles[data.vehicle]["name"],
-        submitText = Lang:t('menus.submit_text'),
-        inputs = {
-            {
-                text = Lang:t('menus.submit_ID'),
-                name = "playerid",
-                type = "number",
-                isRequired = true
-            }
+    local dialog = lib.inputDialog(QBCore.Shared.Vehicles[data.vehicle]["name"], {
+        {
+            type = 'number',
+            label = Lang:t('menus.submit_ID'),
+            placeholder = 1
         }
     })
-    if dialog then
-        if not dialog.playerid then return end
-        if data.type == 'testDrive' then
-            TriggerServerEvent('qb-vehicleshop:server:customTestDrive', data.vehicle, dialog.playerid)
-        elseif data.type == 'sellVehicle' then
-            TriggerServerEvent('qb-vehicleshop:server:sellShowroomVehicle', data.vehicle, dialog.playerid)
-        end
+
+    if not dialog then return end
+
+    if not dialog.playerid then return end
+
+    local playerId = tonumber(dialog[1])
+    if data.type == 'testDrive' then
+        TriggerServerEvent('qb-vehicleshop:server:customTestDrive', data.vehicle, playerId)
+    elseif data.type == 'sellVehicle' then
+        TriggerServerEvent('qb-vehicleshop:server:sellShowroomVehicle', data.vehicle, playerId)
     end
 end)
 
